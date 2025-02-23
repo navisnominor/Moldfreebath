@@ -20,6 +20,7 @@ This Home Assistant blueprint provides an automated two-stage mold risk control 
 - At least one of:
   - Fan switches (`switch.fan_x`)
   - Dehumidifier switches (`switch.dehumidifier_x`)
+- **Dependency:** Requires the [mold_risk_index integration](https://github.com/Strixx76/mold_risk_index).
 
 ## Input Parameters
 | Parameter | Description | Default |
@@ -47,11 +48,12 @@ This Home Assistant blueprint provides an automated two-stage mold risk control 
 - Nighttime start and end events.
 
 ## Usage
-1. Add this blueprint to your Home Assistant automation.
-2. Configure the required sensors and switches.
-3. Adjust thresholds and delays to suit your environment.
-4. Enable nighttime mode and cycling if desired.
-5. Save and activate the automation.
+1. Install the required [mold_risk_index integration](https://github.com/Strixx76/mold_risk_index).
+2. Add this blueprint to your Home Assistant automation.
+3. Configure the required sensors and switches.
+4. Adjust thresholds and delays to suit your environment.
+5. Enable nighttime mode and cycling if desired.
+6. Save and activate the automation.
 
 ## Notes
 - Ensure that the mold risk index sensor provides accurate readings.
