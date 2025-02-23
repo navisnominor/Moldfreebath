@@ -18,12 +18,13 @@ blueprint:
         entity:
           domain: sensor
     fan_switches:
-      name: Fan Switches
-      description: "The switch(es) controlling the fan(s) (e.g., Shelly devices)."
+      name: Fan Switches (Optional)
+      description: "The switch(es) controlling the fan(s). Leave empty if not used."
       selector:
         entity:
           domain: switch
           multiple: true
+      default: []
     dehumidifier_switches:
       name: Dehumidifier Switches (Optional)
       description: "The switch(es) controlling the dehumidifier(s). Leave empty if not used."
@@ -32,7 +33,13 @@ blueprint:
           domain: switch
           multiple: true
       default: []
-      optional: true
+    required_device:
+      name: Required Device
+      description: "At least one of Fan Switches or Dehumidifier Switches must be provided."
+      selector:
+        template:
+          value_template: >
+            {{ fan_switches | length > 0 or dehumidifier_switches | length > 0 }}
     fan_on_threshold:
       name: Fan On Threshold
       description: "Risk threshold at which the fan(s) turn on."
