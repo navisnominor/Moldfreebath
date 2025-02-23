@@ -33,13 +33,12 @@ blueprint:
           domain: switch
           multiple: true
       default: []
-    required_device:
-      name: Required Device
+    fan_or_dehumidifier_required:
+      name: Fan or Dehumidifier Required
       description: "At least one of Fan Switches or Dehumidifier Switches must be provided."
       selector:
-        template:
-          value_template: >
-            {{ fan_switches | length > 0 or dehumidifier_switches | length > 0 }}
+        boolean: {}
+      default: true
     fan_on_threshold:
       name: Fan On Threshold
       description: "Risk threshold at which the fan(s) turn on."
