@@ -1,12 +1,11 @@
 blueprint:
-  name: Two-Stage Mold Risk Dehumidifier Control with Multiple Entities
+  name: Two-Stage Mold Risk Dehumidifier Control with Staged Off (Risk Index Only)
   description: >
-    Two-stage dehumidification that uses a risk index (e.g., from the mold_risk_index integration)
-    along with optional humidity and temperature sensors for reference.
-    The fan(s) turn on immediately when the risk exceeds the fan threshold.
-    If the risk remains above the dehumidifier threshold for a set delay, the dehumidifier(s) turn on.
-    Both devices are turned off only after low-risk readings persist.
-    Nighttime behavior can be modified independently.
+    Two-stage dehumidification control using a mold risk index from the mold_risk_index integration.
+    The fan(s) turn on immediately when the risk exceeds the fan threshold, and if the risk persists,
+    the dehumidifier(s) are activated after a delay. When the risk drops, the dehumidifier(s) turn off first,
+    then after an additional delay the fan(s) turn off. During the nighttime period, only the dehumidifier(s)
+    are turned off if the risk remains low.
   domain: automation
   input:
     sensor_mold_risk_index:
@@ -15,22 +14,6 @@ blueprint:
       selector:
         entity:
           domain: sensor
-    humidity_sensors:
-      name: Humidity Sensors
-      description: Optional humidity sensors for informational purposes.
-      selector:
-        entity:
-          domain: sensor
-          multiple: true
-      default: []
-    temperature_sensors:
-      name: Temperature Sensors
-      description: Optional temperature sensors for informational purposes.
-      selector:
-        entity:
-          domain: sensor
-          multiple: true
-      default: []
     fan_switches:
       name: Fan Switches
       description: The switch(es) controlling the fan(s) (e.g., Shelly devices).
@@ -65,7 +48,7 @@ blueprint:
           unit_of_measurement: ""
     off_threshold:
       name: Off Threshold
-      description: Risk threshold below which both devices are turned off.
+      description: Risk threshold below which devices will eventually be turned off.
       default: 1.0
       selector:
         number:
@@ -81,16 +64,22 @@ blueprint:
           min: 0
           max: 10
           unit_of_measurement: ""
-    delay_dehumidifier:
-      name: Dehumidifier Delay
+    delay_dehumidifier_on:
+      name: Dehumidifier On Delay
       description: Delay to confirm risk remains above the dehumidifier threshold before turning it on.
       default: "00:10:00"
       selector:
         time:
-    delay_off:
-      name: Off Delay
-      description: Delay to confirm risk remains below the off threshold before turning off both devices.
+    delay_dehumidifier_off:
+      name: Dehumidifier Off Delay
+      description: Delay to confirm risk remains below the off threshold before turning off dehumidifier(s).
       default: "00:05:00"
+      selector:
+        time:
+    delay_fan_off:
+      name: Fan Off Delay
+      description: Delay after turning off dehumidifier(s) before turning off fan(s).
+      default: "00:03:00"
       selector:
         time:
     delay_night:
@@ -156,7 +145,7 @@ action:
             entity_id: !input dehumidifier_switches
             state: "off"
         sequence:
-          - delay: !input delay_dehumidifier
+          - delay: !input delay_dehumidifier_on
           - condition: numeric_state
             entity_id: !input sensor_mold_risk_index
             above: !input dehumidifier_on_threshold
@@ -164,25 +153,41 @@ action:
             target:
               entity_id: !input dehumidifier_switches
 
-  # Turn off both fan(s) and dehumidifier(s) if risk remains below the off threshold.
+  # Two-Stage Off Process:
+  # Stage 1: Turn off dehumidifier(s) if risk remains below the off threshold.
   - choose:
       - conditions:
           - condition: numeric_state
             entity_id: !input sensor_mold_risk_index
             below: !input off_threshold
         sequence:
-          - delay: !input delay_off
+          - delay: !input delay_dehumidifier_off
           - condition: numeric_state
             entity_id: !input sensor_mold_risk_index
             below: !input off_threshold
           - service: switch.turn_off
             target:
-              entity_id: 
-                - !input fan_switches
-                - !input dehumidifier_switches
+              entity_id: !input dehumidifier_switches
 
-  # At night: Turn off the dehumidifier(s) if risk remains below the nighttime off threshold,
-  # but leave the fan(s) running.
+  # Stage 2: After dehumidifier(s) are off, turn off the fan(s) after an additional delay.
+  - choose:
+      - conditions:
+          - condition: numeric_state
+            entity_id: !input sensor_mold_risk_index
+            below: !input off_threshold
+          - condition: state
+            entity_id: !input dehumidifier_switches
+            state: "off"
+          - condition: state
+            entity_id: !input fan_switches
+            state: "on"
+        sequence:
+          - delay: !input delay_fan_off
+          - service: switch.turn_off
+            target:
+              entity_id: !input fan_switches
+
+  # Nighttime Special: During nighttime, only turn off the dehumidifier(s) if risk remains below the nighttime off threshold.
   - choose:
       - conditions:
           - condition: time
