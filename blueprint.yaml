@@ -41,7 +41,6 @@ blueprint:
         number:
           min: 0
           max: 10
-          unit_of_measurement: ""
     dehumidifier_on_threshold:
       name: Dehumidifier On Threshold
       description: Risk threshold at which the dehumidifier(s) turn on.
@@ -50,7 +49,6 @@ blueprint:
         number:
           min: 0
           max: 10
-          unit_of_measurement: ""
     off_threshold:
       name: Off Threshold
       description: Risk threshold below which devices will eventually be turned off.
@@ -59,7 +57,6 @@ blueprint:
         number:
           min: 0
           max: 10
-          unit_of_measurement: ""
     nighttime_off_threshold:
       name: Nighttime Off Threshold
       description: Risk threshold below which the dehumidifier(s) are turned off at night.
@@ -68,7 +65,6 @@ blueprint:
         number:
           min: 0
           max: 10
-          unit_of_measurement: ""
     delay_dehumidifier_on:
       name: Dehumidifier On Delay
       description: Delay to confirm risk remains above the dehumidifier threshold before turning it on.
@@ -138,127 +134,4 @@ trigger:
   - platform: numeric_state
     entity_id: !input sensor_mold_risk_index
     below: !input nighttime_off_threshold
-condition: []
-action:
-  # Stage 1: Turn on the fan(s) immediately if risk exceeds the fan threshold.
-  - choose:
-      - conditions:
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            above: !input fan_on_threshold
-          - condition: state
-            entity_id: !input fan_switches
-            state: "off"
-        sequence:
-          - service: switch.turn_on
-            target:
-              entity_id: !input fan_switches
-
-  # Stage 2: (Optional) Turn on the dehumidifier(s) if risk exceeds the dehumidifier threshold.
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: >
-              {{ !input.dehumidifier_switches | length == 0 or !input.dehumidifier_switches | count > 0 }}
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            above: !input dehumidifier_on_threshold
-          - condition: state
-            entity_id: !input dehumidifier_switches
-            state: "off"
-        sequence:
-          - delay: !input delay_dehumidifier_on
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            above: !input dehumidifier_on_threshold
-          - service: switch.turn_on
-            target:
-              entity_id: !input dehumidifier_switches
-
-  # Two-Stage Off Process:
-  # Stage 1: Turn off dehumidifier(s) if risk remains below the off threshold.
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ !input.dehumidifier_switches | length > 0 }}"
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            below: !input off_threshold
-        sequence:
-          - delay: !input delay_dehumidifier_off
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            below: !input off_threshold
-          - service: switch.turn_off
-            target:
-              entity_id: !input dehumidifier_switches
-
-  # Stage 2: After dehumidifier(s) are off, turn off the fan(s) after an additional delay.
-  - choose:
-      - conditions:
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            below: !input off_threshold
-          - condition: state
-            entity_id: !input fan_switches
-            state: "on"
-          - condition: template
-            value_template: >
-              {% if (!input.dehumidifier_switches | length) > 0 %}
-                {{ states(!input.dehumidifier_switches[0]) == "off" }}
-              {% else %}
-                true
-              {% endif %}
-        sequence:
-          - delay: !input delay_fan_off
-          - service: switch.turn_off
-            target:
-              entity_id: !input fan_switches
-
-  # Nighttime Special: During nighttime, only turn off the dehumidifier(s) if risk remains below the nighttime off threshold.
-  - choose:
-      - conditions:
-          - condition: time
-            after: !input nighttime_start
-            before: !input nighttime_end
-          - condition: template
-            value_template: "{{ !input.dehumidifier_switches | length > 0 }}"
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            below: !input nighttime_off_threshold
-        sequence:
-          - delay: !input delay_night
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            below: !input nighttime_off_threshold
-          - service: switch.turn_off
-            target:
-              entity_id: !input dehumidifier_switches
-
-  # Optional Cycle: If dehumidifier cycling is enabled, after the dehumidifier has been turned off,
-  # wait for the configured cycle on delay and then, if the risk is again high, turn the dehumidifier back on.
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ !input.enable_dehumidifier_cycle }}"
-        sequence: []
-      - conditions:
-          - condition: template
-            value_template: "{{ !input.enable_dehumidifier_cycle }}"
-        sequence: []
-  - choose:
-      - conditions:
-          - condition: template
-            value_template: "{{ input.enable_dehumidifier_cycle }}"
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            above: !input dehumidifier_on_threshold
-        sequence:
-          - delay: !input cycle_dehumidifier_on_delay
-          - condition: numeric_state
-            entity_id: !input sensor_mold_risk_index
-            above: !input dehumidifier_on_threshold
-          - service: switch.turn_on
-            target:
-              entity_id: !input dehumidifier_switches
 mode: restart
